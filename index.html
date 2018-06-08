@@ -8,6 +8,8 @@
 		<title>Fret Friend</title>
 
 		<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+		<link href="assets/css/navbar.css" rel="stylesheet">
+		<link href="assets/css/main.css" rel="stylesheet">
 
 		<!--[if lt IE 9]>
 			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
@@ -15,28 +17,57 @@
 		<![endif]-->
 	</head>
 	<body>
-		<nav class="navbar navbar-inverse navbar-static-top" role="navigation">
+		<header class="navbar navbar-inverse navbar-fixed-top bs-docs-nav" role="banner">
 			<div class="container">
 				<div class="navbar-header">
-					<a class="navbar-brand" href="#javascript:void(0)">Fret Friend</a>
+					<button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".bs-navbar-collapse">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a href="#" class="navbar-brand open_page" data-page='home'><span class='glyphicon glyphicon-music'></span> Fret Friend</a>
 				</div>
+				<nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
+					<ul class="nav navbar-nav navbar-right">
+						<li class="dropdown">
+							<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span class='current_instrument'>Guitar (Standard)</span> <b class="caret"></b></a>
+							<ul class="dropdown-menu" id='instruments_dropdown'></ul>
+						</li>
+						<li>
+							<a href="#" class='open_page' data-page='scales'>Scales</a>
+						</li>
+						<li>
+							<a href="#" class='open_page' data-page='chords'>Chords</a>
+						</li>
+					</ul>
+				</nav>
 			</div>
-		</nav>
+		</header>
 
-		<div class="container">
+		<div class="container page" id='home_page' style='display:none;'>
 			<div class="row">
 				<div class="col-lg-12 text-center">
-					// stuff here....
+					<br><br><br>
+					<h1><span class='glyphicon glyphicon-music'></span> Fret Friend</h1><br><br>
+					
+					<div class='well'>
+						<h3>Welcome</h3>
+						<p>You're currently using a <b class='current_instrument'>Guitar (Standard)</b>. You can change the instrument (or create a new one) by clicking on it at the top of the page.</p>
+						<button class='btn btn-lg btn-info scales'>View Scales</button>
+						<button class='btn btn-lg btn-info scales'>View Chords</button>
+					</div>
+					
 				</div>
 			</div>
 		</div>
 
 		<script src="//code.jquery.com/jquery-2.2.4.min.js"></script>
 		<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-		<script src='js/fretted.js'></script>
-		<script src='js/musicology.js'></script>
-		<script src='js/voicings.js'></script>
-		<script src='js/jsql.js'></script>
-		<script src='js/index.js'></script>
+		<script src='assets/js/fretted.js'></script>
+		<script src='assets/js/musicology.js'></script>
+		<script src='assets/js/voicings.js'></script>
+		<script src='assets/js/jsql.js'></script>
+		<script src='assets/js/index.js'></script>
 	</body>
 </html>
