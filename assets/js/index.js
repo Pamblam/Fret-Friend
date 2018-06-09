@@ -1,5 +1,6 @@
 
 var DB = {};
+var pending_render = false;
 $(()=>{
 	$("#new_instrument_modal").modal({show: false, backdrop: 'static', keyboard: false});
 	initDB();
@@ -111,10 +112,23 @@ $(document).on('click', '.remove-instrument', function(e){
 	saveDB();
 });
 
-$(document).on("change", "#scale_key", function(){
+$(document).on("change", "#scale_key, #chord_key", function(){
 	var key = $(this).val();
+	$("#scale_key").val(key);
+	$("#chord_key").val(key);
 	setKey(key);
 });
+
+$(document).on('change','#chord_type', function(){
+	var ctype = $(this).val();
+	setChordType(ctype);
+});
+
+function titleCase(text){
+	return text.replace(/\w\S*/g, function (txt) {
+		return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+	});
+}
 
 function validateNote(note){
 	var noteMap = ['C',['C#','Db'],'D',['D#','Eb'],'E','F',['F#','Gb'],'G',['G#','Ab'],'A',['A#','Bb'],'B'];
@@ -132,6 +146,7 @@ function validateNote(note){
 function openPage(page){
 	$(".page").slideUp('fast', ()=>$("#"+page+"_page").slideDown());
 	DB.state.tab=page;
+	if(DB.state.tab=="chords" && pending_render) renderChords(pending_render);
 	saveDB();
 }
 
@@ -165,9 +180,15 @@ function setState(){
 	var notes = Musicology.getNotes();
 	for(var i=0; i<notes.length; i++){
 		$("#scale_key").append('<option value="'+notes[i]+'" '+(DB.state.key==notes[i]?'selected':'')+'>'+notes[i]+'</option>');
+		$("#chord_key").append('<option value="'+notes[i]+'" '+(DB.state.key==notes[i]?'selected':'')+'>'+notes[i]+'</option>');
+	}
+	var ctypes = Musicology.getChordTypes()
+	for(var i=0; i<ctypes.length; i++){
+		$("#chord_type").append('<option value="'+ctypes[i]+'" '+(DB.state.ctype==ctypes[i]?'selected':'')+'>'+titleCase(ctypes[i])+'</option>');
 	}
 	setKey(DB.state.key);
 	setInstrument(DB.state.instrument);
+	setChordType(DB.state.ctype);
 	openPage(DB.state.tab);
 }
 
@@ -178,24 +199,119 @@ function setKey(key){
 	modes.forEach(mode=>{
 		if(mode==='major') return;
 		if(mode==='ionian') mode = "Major";
-		var titlecase = mode.replace(/\w\S*/g, function(txt){
-			return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-		});
+		var titlecase = titleCase(mode);
 		var id = mode.replace(/ /g, "-")+"scale-chart";
-		$("#scalebox").append('<div class="nobreak"><h3>'+titlecase+'</h3><div id="'+id+'" style=text-align:center; margin:0 auto;></div></div>');
-		var scale_notes = Musicology.getScale(key, mode);
+		var scale_notes = Musicology.getScale(key, mode); scale_notes.pop();
+		$("#scalebox").append('<div class="nobreak"><h3>'+titlecase+'</h3><div><i>Notes in Key: '+(scale_notes.join(", "))+'</i></div><div id="'+id+'" style=text-align:center; margin:0 auto;></div></div>');
 		var scale = new Fretted.Scale().setNotes(scale_notes).setRootNote(key).setNoteStyle('#63AFD0').setRootNoteStyle('#BAEAFF', '#3BA3D0');
 		Fretted[DB.state.instrument]().makeScale(scale).render(Fretted.IMAGE).then(img=>{
 			$(img).addClass("img-responsive").css({margin:"0 auto"}).appendTo("#"+id);
 		});
 	});
 	DB.state.key = key;
+	setChordType(DB.state.ctype);
 	saveDB();
+}
+
+function setChordType(ctype){
+	$(".current_chord_type").html(titleCase(ctype));
+	$("#chordbox").empty();
+	var notes = Musicology.getChord(DB.state.key, ctype);
+	var ins = DB.instruments[DB.state.instrument];
+	var v = new Voicings().setInstrument(ins.strings, ins.frets, ins.tuning);
+	var fb = v.getFretboard();
+	v.setChord(notes);
+	var voicings = v.getAllVoicings(5);
+	var pending_chords = [];
+	var $container = $("#chordbox");
+	$container.append('<div class=row>');
+	var i, strings, s, $col;
+	voicings.forEach(itm=> {
+		
+		var $row = $container.find(".row").last();
+		if($row.find(".col-xs-2").length==6){
+			$row=$("<div class=row>");
+			$container.append($row);
+		}
+		var $col = $("<div class='col-xs-2'>");
+		$col.append("<img src='./assets/imgs/loader.gif' class=img-responsive>");
+		$row.append($col);
+		
+		strings = [];
+		for(i=0; i<itm.length; i++){
+			if(itm[i]=='x') strings.push(new Fretted.String().mute());
+			else{
+				s=new Fretted.String().setFret(itm[i]).setNote(fb[i][itm[i]]);
+				if(DB.state.key == fb[i][itm[i]]) s.setBGColor('#BAEAFF').setTextColor('#3BA3D0');
+				else s.setBGColor('#63AFD0');
+				strings.push(s);
+			}
+		}
+		
+		pending_chords.push({col: $col, strings:strings});	
+		
+	});
+	setTimeout(()=>renderChords(pending_chords),500);
+	DB.state.ctype = ctype;
+	saveDB();
+}
+
+function slowLoop(items, loopBody) {
+	return new Promise(f => {
+		let done = arguments[2] || f;
+		let idx = arguments[3] || 0;
+		let cb = items[idx + 1] ? () => slowLoop(items, loopBody, done, idx + 1) : done;
+		loopBody(items[idx], idx, cb);
+	});
+}
+
+var render_state = 0; // 0=not rendering, 1=rendering
+var render_kill_signal = 0;
+
+function killRender(){
+	return new Promise(done=>{
+		if(render_state===0) return done();
+		render_kill_signal = 1;
+		var i=setInterval(()=>{
+			if(render_state===0){
+				console.log("killed render");
+				render_kill_signal=0;
+				clearInterval(i);
+				done();
+			}
+		},100);
+	});
+}
+
+function renderChords(chords){
+	if(DB.state.tab!=="chords"){
+		pending_render = chords;
+		return;
+	}
+	pending_render = false;
+	killRender().then(()=>{
+		render_state=1;
+		slowLoop(chords, function(itm, idx, cb){
+			if(render_kill_signal){
+				render_state=0;
+				return;
+			}
+			$("#vdeets").html("Loading "+(idx+1)+" of "+chords.length+" voicings.");
+			Fretted[DB.state.instrument]().makeChord(itm.strings).render(Fretted.IMAGE).then(img=>{
+				itm.col.empty();
+				$(img).addClass("img-responsive").css({margin:"0 auto"}).appendTo(itm.col);
+				cb();
+			});
+		}).then(()=>{
+			render_state=0;
+			$("#vdeets").html(chords.length+" voicings.");
+		});
+	});
 }
 
 function initDB(){		
 	DB.state = localStorage.getItem('state');
-	if(!DB.state) DB.state = {instrument:'Guitar (Standard)', tab: 'home', key:'C'}
+	if(!DB.state) DB.state = {instrument:'Guitar (Standard)', tab: 'home', key:'C', ctype: 'major'}
 	else DB.state = JSON.parse(DB.state);
 	DB.instruments = localStorage.getItem('instruments');
 	if(!DB.instruments){
