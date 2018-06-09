@@ -1,0 +1,14 @@
+body{
+	margin-top: -5em;
+}
+.noprint{
+	display:none;
+}
+
+.well{
+	border: none;
+}
+
+.nobreak{
+	page-break-inside: avoid;
+}
