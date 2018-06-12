@@ -56,6 +56,37 @@ const Voicings = (function(){
 		});
 	}
 	
+	function fingerCount(pos) {
+		var fingers = 0;
+		var frets = [];
+		for (var i = 0; i < Math.max(...(pos.filter(i => i != "x"))); i++)
+			frets.push([]);
+		for (var i = 0; i < pos.length; i++) {
+			if (pos[i] === "x" || pos[i] === 0) continue;
+			frets[pos[i] - 1].push(i);
+		}
+		for (var i = 0; i < frets.length; i++) {
+			if (!frets[i].length) continue;
+			if (!frets[i].length == 1) {
+				fingers++;
+				continue;
+			}
+			frets[i].sort().reverse();
+			for (var string = 0; string < frets[i].length; string++) {
+				var canBarre = true;
+				for (var s = frets[i][string]; s--; ) {
+					if (pos[s] == 'x' || pos[s] < i) {
+						canBarre = false;
+						continue;
+					}
+				}
+				fingers++;
+				if (canBarre) break;
+			}
+		}
+		return fingers;
+	}
+	
 	class Voicings{
 		constructor(){
 			this.strings=null;
@@ -78,17 +109,18 @@ const Voicings = (function(){
 			return occurences;
 		}
 		
-		getAllVoicings(maxFretDistance){
+		getAllVoicings(){
 			var stringNotes = [], countXes, x1, x2, fretDistance, n, i, o, combos, chord, voicings=[], ca, min, max, avgHeight, filter, ah, bh, ad, bd;
 			fretDistance = f=>{
 				min = f.reduce((a,c)=>c=='x'?a:a!=null&&a<c?a:c,null);
 				max = f.reduce((a,c)=>c=='x'?a:a!=null&&a>c?a:c,null);
-				return max-min;
+				return max-min+1;
 			};
 			countXes=a=>a.reduce((a,c)=>c=='x'?a+1:a,0);
 			filter = f=>{
-				if(undefined==maxFretDistance) return true;
-				return maxFretDistance>=fretDistance(f);
+				if(fingerCount(f) > 4) return false;
+				var fd = fretDistance(f);
+				return 5>=fd;
 			};
 			avgHeight = f=>f.reduce((a,c)=>c=='x'?a:a+parseInt(c),0)/f.filter(a=>a!=='x'&&a!==0).length;
 			for(n=0; n<this.strings; n++) stringNotes.push(['x']);
@@ -106,7 +138,10 @@ const Voicings = (function(){
 			voicings.sort((a,b)=>{
 				x1 = countXes(a);
 				x2 = countXes(b);
-				if(x1 != x2) return x1<x2?-1:1
+				if(x1 != x2) return x1<x2?-1:1;
+				var f1=fingerCount(a)
+				var f2=fingerCount(b)
+				if(f1 != f2) return f1<f2?-1:1;
 				ah = avgHeight(a);
 				bh = avgHeight(b);
 				if(ah != bh) return ah<bh?-1:1;
